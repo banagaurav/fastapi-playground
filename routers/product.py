@@ -1,8 +1,7 @@
+# routers/product.py
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from models import Product
-import database_models
-from dependencies import get_db
+from models import Product  # Pydantic model
+from services.product_service import ProductService
 
 router = APIRouter(
     prefix="/products",
@@ -10,44 +9,29 @@ router = APIRouter(
 )
 
 @router.get("/")
-def get_all_products(db: Session = Depends(get_db)):
-    db_products = db.query(database_models.Product).all()
-    return db_products
+def get_all_products(service: ProductService = Depends(ProductService)):
+    return service.get_all()
 
 @router.get("/{id}")
-def get_product_by_id(id: int, db: Session = Depends(get_db)):
-    db_product = db.query(database_models.Product).filter(database_models.Product.id == id).first()
-    if db_product:
-        return db_product
+def get_product_by_id(id: int, service: ProductService = Depends(ProductService)):
+    product = service.get_by_id(id)
+    if product:
+        return product
     raise HTTPException(status_code=404, detail="Product not found")
 
 @router.post("/")
-def create_product(product: Product, db: Session = Depends(get_db)):
-    db_product = database_models.Product(name=product.name)
-    db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
-    return db_product
+def create_product(product: Product, service: ProductService = Depends(ProductService)):
+    return service.create(product.name)
 
 @router.put("/{id}")
-def update_product(id: int, product: Product, db: Session = Depends(get_db)):
-    db_product = db.query(database_models.Product).filter(database_models.Product.id == id).first()
-    
-    if not db_product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    db_product.name = product.name
-    db.commit()
-    db.refresh(db_product)
-    return db_product
+def update_product(id: int, product: Product, service: ProductService = Depends(ProductService)):
+    updated_product = service.update(id, product.name)
+    if updated_product:
+        return updated_product
+    raise HTTPException(status_code=404, detail="Product not found")
 
 @router.delete("/{id}")
-def delete_product(id: int, db: Session = Depends(get_db)):
-    db_product = db.query(database_models.Product).filter(database_models.Product.id == id).first()
-    
-    if not db_product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    db.delete(db_product)
-    db.commit()
-    return {"message": "Product deleted successfully"}
+def delete_product(id: int, service: ProductService = Depends(ProductService)):
+    if service.delete(id):
+        return {"message": "Product deleted successfully"}
+    raise HTTPException(status_code=404, detail="Product not found")
